@@ -9,36 +9,18 @@
 <link rel="manifest" href="manifest.json">
 
 <style>
-body { margin:0; font-family: sans-serif; background:#f5f5f5; }
-header {
- position:fixed; top:0; left:0; right:0; height:60px;
- background:#3b82f6; color:white;
- display:flex; align-items:center; justify-content:center;
- font-size:20px; font-weight:bold; z-index:10;
-}
-
+body { margin:0; font-family:sans-serif; background:#f5f5f5; }
+header { position:fixed; top:0; left:0; right:0; height:60px; background:#3b82f6; color:white;
+ display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:bold; z-index:10; }
 #content { padding:70px 15px 80px; }
-
-nav {
- position:fixed; bottom:0; left:0; right:0; height:60px;
- background:white; border-top:1px solid #ddd; display:flex;
-}
+nav { position:fixed; bottom:0; left:0; right:0; height:60px; background:white; border-top:1px solid #ddd; display:flex; }
 nav button { flex:1; border:none; background:none; font-size:14px; }
-
 .page { display:none; }
 .page.active { display:block; }
-
-.card {
- background:white; padding:15px; border-radius:10px;
- box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:15px;
-}
-
+.card { background:white; padding:15px; border-radius:10px; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:15px; }
 .progress-bar { width:100%; height:16px; background:#ddd; border-radius:8px; overflow:hidden; }
 .progress-bar-inner { height:100%; width:0%; background:#3b82f6; }
-
-#todayRef { font-size: 1.6em; font-weight: bold; }
-#readBtn { font-size: 1.2em; padding:10px; margin-top:10px; }
-
+#todayRef { font-size:1.6em; font-weight:bold; }
 .list-item { padding:8px 0; border-bottom:1px solid #eee; }
 .today { background:#e0f2fe; }
 .done { text-decoration:line-through; color:#aaa; }
@@ -51,11 +33,10 @@ nav button { flex:1; border:none; background:none; font-size:14px; }
 
 <div id="content">
 
-<!-- HOME -->
 <div id="home" class="page active">
   <div class="card">
     <h2><span id="todayDate"></span> の通読箇所</h2>
-    <div id="todayRef"></div>
+    <div id="todayRef">読み込み中...</div>
     <button id="readBtn">読みました</button>
   </div>
 
@@ -66,7 +47,6 @@ nav button { flex:1; border:none; background:none; font-size:14px; }
   </div>
 </div>
 
-<!-- PLAN -->
 <div id="planPage" class="page">
   <div class="card">
     <h2>180日プラン</h2>
@@ -74,10 +54,9 @@ nav button { flex:1; border:none; background:none; font-size:14px; }
   </div>
 </div>
 
-<!-- ADMIN -->
 <div id="admin" class="page">
   <div class="card">
-    <h2>開始日設定</h2>
+    <h2>開始日</h2>
     <input type="date" id="startInput">
     <button id="saveStart">保存</button>
   </div>
@@ -93,89 +72,73 @@ nav button { flex:1; border:none; background:none; font-size:14px; }
 
 <script>
 
-/* ===== CSV読み込み（完全対策版） ===== */
-fetch("/bible-challenge180-ver.2/plan.csv?v=3")
-.then(res => {
-  if (!res.ok) throw new Error("CSV読めてない");
-  return res.text();
-})
-.then(text => {
+function init(plan){
 
-  const plan = text.split("\n")
-    .map(l => l.trim())
-    .filter(l => l.length > 0);
-
-  /* ===== 開始日 ===== */
   let startDate = localStorage.getItem("startDate") || new Date().toISOString().slice(0,10);
 
-  function calcDayIndex() {
-    return Math.min(179,
-      Math.floor((new Date() - new Date(startDate)) / 86400000)
-    );
+  function calcDayIndex(){
+    return Math.min(179, Math.floor((new Date()-new Date(startDate))/86400000));
   }
 
   let dayIndex = calcDayIndex();
 
-  /* ===== 表示 ===== */
-  document.getElementById("todayRef").textContent =
-    plan[dayIndex] || "完了";
+  document.getElementById("todayRef").textContent = plan[dayIndex] || "完了";
+  document.getElementById("todayDate").textContent = new Date().toLocaleDateString("ja-JP");
 
-  document.getElementById("todayDate").textContent =
-    new Date().toLocaleDateString("ja-JP");
+  document.getElementById("bar").style.width = ((dayIndex+1)/180*100)+"%";
+  document.getElementById("progressText").textContent = `${dayIndex+1}/180 日`;
 
-  /* ===== 進捗 ===== */
-  document.getElementById("bar").style.width =
-    ((dayIndex+1)/180*100)+"%";
+  let done = JSON.parse(localStorage.getItem("done")||"[]");
 
-  document.getElementById("progressText").textContent =
-    `${dayIndex+1}/180 日`;
-
-  /* ===== 読了記録 ===== */
-  let done = JSON.parse(localStorage.getItem("done") || "[]");
-
-  document.getElementById("readBtn").onclick = () => {
-    if (!done.includes(dayIndex)) done.push(dayIndex);
-    localStorage.setItem("done", JSON.stringify(done));
+  document.getElementById("readBtn").onclick = ()=>{
+    if(!done.includes(dayIndex)) done.push(dayIndex);
+    localStorage.setItem("done",JSON.stringify(done));
     render();
   };
 
-  /* ===== 描画 ===== */
-  function render() {
+  function render(){
     document.getElementById("allPlan").innerHTML =
       plan.map((p,i)=>{
-        let cls = "list-item";
-        if(i===dayIndex) cls += " today";
-        if(done.includes(i)) cls += " done";
+        let cls="list-item";
+        if(i===dayIndex) cls+=" today";
+        if(done.includes(i)) cls+=" done";
         return `<div class="${cls}">${p}</div>`;
       }).join("");
   }
 
   render();
+}
 
+/* CSV読み込み */
+fetch("./plan.csv?v=5")
+.then(res=>{
+  if(!res.ok) throw new Error();
+  return res.text();
 })
-.catch(() => {
-  document.getElementById("todayRef").textContent = "CSV読み込みエラー";
+.then(text=>{
+  const plan = text.split("\n")
+    .map(l=>l.trim())
+    .filter(l=>l.length>0);
+  init(plan);
+})
+.catch(()=>{
+  document.getElementById("todayRef").textContent="CSV読み込みエラー";
 });
 
-/* ===== タブ切替 ===== */
+/* タブ */
 document.querySelectorAll("nav button").forEach(btn=>{
- btn.onclick = ()=>{
-   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-   document.getElementById(btn.dataset.tab).classList.add('active');
- };
+  btn.onclick=()=>{
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.getElementById(btn.dataset.tab).classList.add('active');
+  };
 });
 
-/* ===== 開始日保存 ===== */
-document.getElementById("saveStart").onclick = ()=>{
-  const d = document.getElementById("startInput").value;
-  localStorage.setItem("startDate", d);
+/* 開始日 */
+document.getElementById("saveStart").onclick=()=>{
+  const d=document.getElementById("startInput").value;
+  localStorage.setItem("startDate",d);
   location.reload();
 };
-
-/* ===== PWA ===== */
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(()=>{});
-}
 
 </script>
 
