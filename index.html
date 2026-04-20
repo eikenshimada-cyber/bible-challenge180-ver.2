@@ -84,31 +84,45 @@ nav button { flex:1; border:none; background:none; font-size:14px; }
 <script>
 
 /* ===== CSV読み込み ===== */
-fetch("./plan.csv")
-  .then(res => res.text())
+fetch("./plan.csv?v=2")
+  .then(res => {
+    if (!res.ok) throw new Error("CSV読めてない");
+    return res.text();
+  })
   .then(text => {
 
     const plan = text.split("\n")
-      .filter(l => l.startsWith("Day"));
+      .map(l => l.trim())
+      .filter(l => l.length > 0);  // ← これ重要（Dayチェック消す）
 
-  /* ===== 開始日 ===== */
-  let startDate = localStorage.getItem("startDate") || new Date().toISOString().slice(0,10);
+    /* ===== 開始日 ===== */
+    let startDate = localStorage.getItem("startDate") || new Date().toISOString().slice(0,10);
 
-  function calcDayIndex() {
-    return Math.min(179,
-      Math.floor((new Date() - new Date(startDate)) / 86400000)
-    );
-  }
+    function calcDayIndex() {
+      return Math.min(179,
+        Math.floor((new Date() - new Date(startDate)) / 86400000)
+      );
+    }
 
-  let dayIndex = calcDayIndex();
+    const dayIndex = calcDayIndex();
 
-  /* ===== 今日表示 ===== */
-  document.getElementById("todayRef").textContent =
-    plan[dayIndex] || "完了";
+    /* ===== 表示 ===== */
+    document.getElementById("todayRef").textContent =
+      plan[dayIndex] || "完了";
 
-  document.getElementById("todayDate").textContent =
-    new Date().toLocaleDateString("ja-JP");
+    document.getElementById("allPlan").innerHTML =
+      plan.map((p,i)=>`<div>${p}</div>`).join("");
 
+    document.getElementById("bar").style.width =
+      ((dayIndex+1)/180*100)+"%";
+
+    document.getElementById("progressText").textContent =
+      `${dayIndex+1}/180 日`;
+
+  })
+  .catch(() => {
+    document.getElementById("todayRef").textContent = "CSV読み込みエラー";
+  });
   /* ===== 進捗 ===== */
   document.getElementById("bar").style.width =
     ((dayIndex+1)/180*100)+"%";
