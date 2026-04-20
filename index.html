@@ -84,14 +84,12 @@ nav button { flex:1; border:none; background:none; font-size:14px; }
 <script>
 
 /* ===== CSV読み込み ===== */
-fetch("plan.csv")
-.then(res => {
-  console.log(res.status);
-  return res.text();
-})
-.then(text => console.log(text));
+fetch("./plan.csv")
+  .then(res => res.text())
+  .then(text => {
 
-  const plan = text.split("\n").filter(l=>l.trim());
+    const plan = text.split("\n")
+      .filter(l => l.startsWith("Day"));
 
   /* ===== 開始日 ===== */
   let startDate = localStorage.getItem("startDate") || new Date().toISOString().slice(0,10);
