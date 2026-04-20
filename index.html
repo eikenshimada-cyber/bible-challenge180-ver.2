@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BC180</title>
+
+<meta name="theme-color" content="#3b82f6" />
+<link rel="manifest" href="manifest.json">
+
+<style>
+body { margin:0; font-family: sans-serif; background:#f5f5f5; }
+header { position:fixed; top:0; left:0; right:0; height:60px; background:#3b82f6; color:white;
+ display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:bold; z-index:10; }
+
+#content { padding:70px 15px 80px; }
+
+nav { position:fixed; bottom:0; left:0; right:0; height:60px; background:white; border-top:1px solid #ddd; display:flex; }
+nav button { flex:1; border:none; background:none; font-size:14px; }
+
+.page { display:none; }
+.page.active { display:block; }
+
+.card { background:white; padding:15px; border-radius:10px; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:15px; }
+
+.progress-bar { width:100%; height:16px; background:#ddd; border-radius:8px; overflow:hidden; }
+.progress-bar-inner { height:100%; width:0%; background:#3b82f6; }
+
+#todayRef { font-size: 1.6em; font-weight: bold; }
+#readBtn { font-size: 1.2em; padding:10px; margin-top:10px; }
+
+.list-item { padding:8px 0; border-bottom:1px solid #eee; }
+.today { background:#e0f2fe; }
+.done { text-decoration:line-through; color:#aaa; }
+</style>
+</head>
+
+<body>
+
+<header>BC180</header>
+
+<div id="content">
+
+<!-- HOME -->
+<div id="home" class="page active">
+  <div class="card">
+    <h2><span id="todayDate"></span> の通読箇所</h2>
+    <div id="todayRef"></div>
+    <button id="readBtn">読みました</button>
+  </div>
+
+  <div class="card">
+    <h2>進捗</h2>
+    <div class="progress-bar"><div id="bar" class="progress-bar-inner"></div></div>
+    <div id="progressText"></div>
+  </div>
+</div>
+
+<!-- PLAN -->
+<div id="planPage" class="page">
+  <div class="card">
+    <h2>180日プラン</h2>
+    <div id="allPlan"></div>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div id="admin" class="page">
+  <div class="card">
+    <h2>開始日設定</h2>
+    <input type="date" id="startInput">
+    <button id="saveStart">保存</button>
+  </div>
+</div>
+
+</div>
+
+<nav>
+  <button data-tab="home">Home</button>
+  <button data-tab="planPage">Plan</button>
+  <button data-tab="admin">Admin</button>
+</nav>
+
+<script>
+
+/* ===== CSV読み込み ===== */
+fetch("plan.csv")
+.then(res => res.text())
+.then(text => {
+
+  const plan = text.split("\n").filter(l=>l.trim());
+
+  /* ===== 開始日 ===== */
+  let startDate = localStorage.getItem("startDate") || new Date().toISOString().slice(0,10);
+
+  function calcDayIndex() {
+    return Math.min(179,
+      Math.floor((new Date() - new Date(startDate)) / 86400000)
+    );
+  }
+
+  let dayIndex = calcDayIndex();
+
+  /* ===== 今日表示 ===== */
+  document.getElementById("todayRef").textContent =
+    plan[dayIndex] || "完了";
+
+  document.getElementById("todayDate").textContent =
+    new Date().toLocaleDateString("ja-JP");
+
+  /* ===== 進捗 ===== */
+  document.getElementById("bar").style.width =
+    ((dayIndex+1)/180*100)+"%";
+
+  document.getElementById("progressText").textContent =
+    `${dayIndex+1}/180 日`;
+
+  /* ===== 読了記録 ===== */
+  let done = JSON.parse(localStorage.getItem("done") || "[]");
+
+  document.getElementById("readBtn").onclick = () => {
+    if (!done.includes(dayIndex)) done.push(dayIndex);
+    localStorage.setItem("done", JSON.stringify(done));
+    render();
+  };
+
+  /* ===== 描画 ===== */
+  function render() {
+    document.getElementById("allPlan").innerHTML =
+      plan.map((p,i)=>{
+        let cls = "list-item";
+        if(i===dayIndex) cls += " today";
+        if(done.includes(i)) cls += " done";
+        return `<div class="${cls}">${p}</div>`;
+      }).join("");
+  }
+
+  render();
+
+});
+
+/* ===== タブ切替 ===== */
+document.querySelectorAll("nav button").forEach(btn=>{
+ btn.onclick = ()=>{
+   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+   document.getElementById(btn.dataset.tab).classList.add('active');
+ };
+});
+
+/* ===== 開始日保存 ===== */
+document.getElementById("saveStart").onclick = ()=>{
+  const d = document.getElementById("startInput").value;
+  localStorage.setItem("startDate", d);
+  location.reload();
+};
+
+/* ===== PWA（オプション） ===== */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+
+</script>
+
+</body>
+</html>
