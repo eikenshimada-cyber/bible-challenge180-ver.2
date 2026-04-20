@@ -84,7 +84,7 @@ nav button { flex:1; border:none; background:none; font-size:14px; }
 <script>
 
 /* ===== CSV読み込み ===== */
-fetch("./plan.csv?v=2")
+fetch("bible-challenge180-ver.2/plan.csv")
   .then(res => {
     if (!res.ok) throw new Error("CSV読めてない");
     return res.text();
