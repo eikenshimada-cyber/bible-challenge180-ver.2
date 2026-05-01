@@ -93,11 +93,13 @@ nav button { flex:1; border:none; background:none; font-size:14px; }
 
 /* ===== Firebase設定 ===== */
 const firebaseConfig = {
-  apiKey: "ここ",
-  authDomain: "ここ",
-  projectId: "ここ",
-};
-firebase.initializeApp(firebaseConfig);
+  apiKey: "AIza...",
+  authDomain: "xxxxx.firebaseapp.com",
+  projectId: "xxxxx",
+  storageBucket: "...",
+  messagingSenderId: "...",
+  appId: "..."
+};firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 /* ===== CSV読み込み ===== */
