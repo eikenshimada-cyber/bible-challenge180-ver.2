@@ -5,10 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>BC180</title>
 
-<!-- PWA -->
 <link rel="manifest" href="./manifest.json">
-
-<!-- iOSアイコン（これだけでOK） -->
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -43,7 +40,6 @@ nav button { flex:1; border:none; background:none; font-size:14px; }
 
 <div id="content">
 
-<!-- Home -->
 <div id="home" class="page active">
   <div class="card">
     <h2><span id="todayDate"></span> の通読箇所</h2>
@@ -57,7 +53,6 @@ nav button { flex:1; border:none; background:none; font-size:14px; }
   </div>
 </div>
 
-<!-- Plan -->
 <div id="today" class="page">
   <div class="card">
     <h2>180日プラン</h2>
@@ -65,7 +60,6 @@ nav button { flex:1; border:none; background:none; font-size:14px; }
   </div>
 </div>
 
-<!-- Progress -->
 <div id="progress" class="page">
   <div class="card">
     <h2>進捗</h2>
@@ -74,7 +68,6 @@ nav button { flex:1; border:none; background:none; font-size:14px; }
   </div>
 </div>
 
-<!-- Admin -->
 <div id="admin" class="page">
   <div class="card">
     <h2>管理者設定</h2>
@@ -92,16 +85,31 @@ nav button { flex:1; border:none; background:none; font-size:14px; }
   <button data-tab="admin">Admin</button>
 </nav>
 
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+
 <script>
 
-/* ================= CSV読み込み ================= */
-fetch("plan.csv?v=10")
+/* ===== Firebase設定 ===== */
+const firebaseConfig = {
+  apiKey: "ここ",
+  authDomain: "ここ",
+  projectId: "ここ",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+/* ===== CSV読み込み ===== */
+fetch("./plan.csv?ver=" + Date.now())
 .then(res => res.text())
 .then(text => {
 
-  const plan = text.split("\n")
-    .map(l=>l.trim())
-    .filter(l=>l.length>0);
+  const plan = text
+    .split(/\r?\n/)
+    .map(line => line.replace(/^\uFEFF/, "").trim())
+    .filter(l => l.length > 0)
+    .map(l => l.split(",")[0].trim());
 
   init(plan);
 
@@ -110,49 +118,88 @@ fetch("plan.csv?v=10")
   document.getElementById("todayRef").textContent="CSV読み込みエラー";
 });
 
-/* ================= 初期化 ================= */
+/* ===== 初期化 ===== */
 function init(plan){
 
   let startDate = localStorage.getItem("startDate") || new Date().toISOString().slice(0,10);
   localStorage.setItem("startDate", startDate);
 
+  const today = new Date();
+  const dateKey = today.toISOString().split("T")[0];
+
   function calcDayIndex(){
-    return Math.min(179, Math.floor((new Date()-new Date(startDate))/86400000));
+    return Math.min(179, Math.floor((today - new Date(startDate)) / 86400000));
   }
 
-  let dayIndex = calcDayIndex();
+  const dayIndex = calcDayIndex();
 
-  /* 今日 */
   document.getElementById("todayRef").textContent = plan[dayIndex] || "完了";
-  document.getElementById("todayDate").textContent = new Date().toLocaleDateString("ja-JP");
+  document.getElementById("todayDate").textContent = today.toLocaleDateString("ja-JP");
 
-  /* プラン一覧 */
   document.getElementById("allPlan").innerHTML =
     plan.map((p,i)=>`Day${i+1}: ${p}`).join("<br>");
 
-  /* 進捗 */
   document.getElementById("bar").style.width = ((dayIndex+1)/180*100)+"%";
   document.getElementById("progressText").textContent = `${dayIndex+1}/180 日`;
 
-  /* Good Servant */
-  let readers = JSON.parse(localStorage.getItem("readers") || "[]");
-
-  function renderReaders(){
-    document.getElementById("readers").innerHTML =
-      readers.map(r=>`<div class='list-item'>${r.name}：${r.time}</div>`).join('');
+  /* ===== 名前保存 ===== */
+  let username = localStorage.getItem("username");
+  if (!username) {
+    username = prompt("名前を入力してください");
+    if (username) localStorage.setItem("username", username);
   }
-  renderReaders();
 
-  document.getElementById("readBtn").onclick = ()=>{
-    let name = prompt("名前");
-    if(!name) return;
-    let now = new Date().toLocaleString("ja-JP");
-    readers.push({name,time:now});
-    localStorage.setItem("readers",JSON.stringify(readers));
-    renderReaders();
+  const readBtn = document.getElementById("readBtn");
+
+  /* ===== リアルタイム表示 ===== */
+  db.collection("reads")
+    .doc(dateKey)
+    .collection("users")
+    .onSnapshot(snapshot => {
+
+      const container = document.getElementById("readers");
+      container.innerHTML = "";
+
+      let alreadyRead = false;
+
+      snapshot.forEach(doc => {
+        const data = doc.data();
+
+        let timeText = "";
+        if (data.time && data.time.toDate) {
+          const d = data.time.toDate();
+          timeText = d.toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"});
+        }
+
+        const div = document.createElement("div");
+        div.className = "list-item";
+        div.textContent = `${data.name}（${timeText}）`;
+        container.appendChild(div);
+
+        if (data.name === username) alreadyRead = true;
+      });
+
+      readBtn.disabled = alreadyRead;
+      readBtn.textContent = alreadyRead ? "読了済み" : "読みました";
+    });
+
+  /* ===== 読みました ===== */
+  readBtn.onclick = async () => {
+
+    if (!username) return alert("名前を入力してください");
+    if (readBtn.disabled) return;
+
+    await db.collection("reads")
+      .doc(dateKey)
+      .collection("users")
+      .doc(username)
+      .set({
+        name: username,
+        time: new Date()
+      });
   };
 
-  /* Admin */
+  /* ===== Admin ===== */
   document.getElementById("startInput").value = startDate;
 
   document.getElementById("saveStart").onclick = ()=>{
@@ -168,7 +215,7 @@ function init(plan){
   };
 }
 
-/* ================= タブ ================= */
+/* ===== タブ ===== */
 document.querySelectorAll("nav button").forEach(btn=>{
  btn.onclick = ()=>{
    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
