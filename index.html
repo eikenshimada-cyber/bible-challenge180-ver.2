@@ -128,7 +128,17 @@ fetch("./plan.csv?ver=" + Date.now())
 /* ===== 初期化 ===== */
 function init(plan){
 
-  let startDate = localStorage.getItem("startDate") || new Date().toISOString().slice(0,10);
+ async function init(plan){
+
+  let doc = await db.collection("config").doc("global").get();
+
+  let startDate;
+
+  if (doc.exists && doc.data().startDate) {
+    startDate = doc.data().startDate;
+  } else {
+    startDate = new Date().toISOString().slice(0,10);
+  }
   localStorage.setItem("startDate", startDate);
 
   const today = new Date();
@@ -216,20 +226,23 @@ if (data.time && data.time.toDate) {
   };
 
   /* ===== Admin ===== */
-  document.getElementById("startInput").value = startDate;
+ document.getElementById("saveStart").onclick = async () => {
+  let pass = prompt("パスワード");
+  if(pass !== "JesusChrist"){
+    alert("違います");
+    return;
+  }
 
-  document.getElementById("saveStart").onclick = ()=>{
-    let pass = prompt("パスワード");
-    if(pass !== "JesusChrist"){
-      alert("違います");
-      return;
-    }
-    let newDate = document.getElementById("startInput").value;
-    if(!newDate) return;
-    localStorage.setItem("startDate", newDate);
-    location.reload();
-  };
-}
+  let newDate = document.getElementById("startInput").value;
+  if(!newDate) return;
+
+  // 🔥 Firestoreに保存
+  await db.collection("config").doc("global").set({
+    startDate: newDate
+  });
+
+  location.reload();
+};
 
 /* ===== タブ ===== */
 document.querySelectorAll("nav button").forEach(btn=>{
