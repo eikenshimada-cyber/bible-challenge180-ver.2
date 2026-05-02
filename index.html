@@ -91,27 +91,24 @@ nav button { flex:1; border:none; background:none; font-size:14px; }
 
 <script>
 
-/* ===== Firebase設定 ===== */
+/* ===== Firebase ===== */
 const firebaseConfig = {
-  apiKey: "AIzaSyAooLGVr9l5_PV3JL6nRTsTmbX6WvNXdXM",
-  authDomain: "bible-charenge-180.firebaseapp.com",
-  projectId: "bible-charenge-180",
-  storageBucket: "bible-charenge-180.firebasestorage.app",
-  messagingSenderId: "824819270075",
-  appId: "1:824819270075:web:e979acc35dfb14a954449e"
+  apiKey: "ここに貼る",
+  authDomain: "ここに貼る",
+  projectId: "ここに貼る"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-/* ===== CSV読み込み ===== */
+/* ===== CSV ===== */
 fetch("./plan.csv?ver=" + Date.now())
 .then(res => res.text())
 .then(text => {
 
   const plan = text
     .split(/\r?\n/)
-    .map(line => line.replace(/^\uFEFF/, "").trim())
-    .filter(l => l.length > 0)
+    .map(l => l.replace(/^\uFEFF/, "").trim())
+    .filter(l => l)
     .map(l => {
       const parts = l.split(",");
       return parts.length > 1 ? parts[0] + " " + parts[1] : parts[0];
@@ -119,134 +116,112 @@ fetch("./plan.csv?ver=" + Date.now())
 
   init(plan);
 
-})
-.catch(()=>{
-  document.getElementById("todayRef").textContent="CSV読み込みエラー";
 });
 
-/* ===== 初期化 ===== */
+/* ===== init ===== */
 function init(plan){
 
-  db.collection("config").doc("global").get().then(doc => {
+  let startDate = localStorage.getItem("startDate") || new Date().toISOString().slice(0,10);
+  localStorage.setItem("startDate", startDate);
 
-    let startDate;
+  const today = new Date();
+  const dateKey = today.toISOString().split("T")[0];
 
-    if (doc.exists && doc.data().startDate) {
-      startDate = doc.data().startDate;
-    } else {
-      startDate = new Date().toISOString().slice(0,10);
-    }
+  function calcDayIndex(){
+    return Math.min(179, Math.floor((today - new Date(startDate)) / 86400000));
+  }
 
-    // 🔥 ここに移動（最小修正）
-    const today = new Date();
-    const dateKey = today.toISOString().split("T")[0];
+  const dayIndex = calcDayIndex();
 
-    function calcDayIndex(){
-      return Math.min(179, Math.floor((today - new Date(startDate)) / 86400000));
-    }
+  document.getElementById("todayRef").textContent = plan[dayIndex] || "完了";
+  document.getElementById("todayDate").textContent = today.toLocaleDateString("ja-JP");
 
-    const dayIndex = calcDayIndex();
+  document.getElementById("allPlan").innerHTML =
+    plan.map((p,i)=>`Day${i+1}: ${p}`).join("<br>");
 
-    document.getElementById("todayRef").textContent = plan[dayIndex] || "完了";
-    document.getElementById("todayDate").textContent = today.toLocaleDateString("ja-JP");
+  document.getElementById("bar").style.width = ((dayIndex+1)/180*100)+"%";
+  document.getElementById("progressText").textContent = `${dayIndex+1}/180 日`;
 
-    document.getElementById("allPlan").innerHTML =
-      plan.map((p,i)=>`Day${i+1}: ${p}`).join("<br>");
+  /* 名前 */
+  let username = localStorage.getItem("username");
+  if (!username) {
+    username = prompt("名前を入力してください");
+    if (username) localStorage.setItem("username", username);
+  }
 
-    document.getElementById("bar").style.width = ((dayIndex+1)/180*100)+"%";
-    document.getElementById("progressText").textContent = `${dayIndex+1}/180 日`;
+  const readBtn = document.getElementById("readBtn");
 
-    /* ===== 名前保存 ===== */
-    let username = localStorage.getItem("username");
-    if (!username) {
-      username = prompt("名前を入力してください");
-      if (username) localStorage.setItem("username", username);
-    }
+  /* 表示 */
+  db.collection("reads")
+    .doc(dateKey)
+    .collection("users")
+    .onSnapshot(snapshot => {
 
-    const readBtn = document.getElementById("readBtn");
+      const container = document.getElementById("readers");
+      container.innerHTML = "";
 
-    /* ===== リアルタイム表示 ===== */
-    db.collection("reads")
+      let alreadyRead = false;
+
+      snapshot.forEach(doc => {
+        const data = doc.data();
+
+        let timeText = "";
+
+        if (data.time && data.time.toDate) {
+          const d = data.time.toDate();
+          timeText = d.toLocaleString("ja-JP", {
+            year:"numeric",month:"2-digit",day:"2-digit",
+            hour:"2-digit",minute:"2-digit"
+          });
+        } else {
+          timeText = "（送信中…）";
+        }
+
+        const div = document.createElement("div");
+        div.className = "list-item";
+        div.textContent = `${data.name}（${timeText}）`;
+        container.appendChild(div);
+
+        if (data.name === username) alreadyRead = true;
+      });
+
+      readBtn.disabled = alreadyRead;
+      readBtn.textContent = alreadyRead ? "読了済み" : "読みました";
+    });
+
+  /* ボタン */
+  readBtn.onclick = async () => {
+
+    if (!username) return;
+    if (readBtn.disabled) return;
+
+    await db.collection("reads")
       .doc(dateKey)
       .collection("users")
-      .onSnapshot(snapshot => {
-
-        const container = document.getElementById("readers");
-        container.innerHTML = "";
-
-        let alreadyRead = false;
-
-        snapshot.forEach(doc => {
-          const data = doc.data();
-
-          let timeText = "";
-
-          if (data.time && data.time.toDate) {
-            const d = data.time.toDate();
-            timeText = d.toLocaleString("ja-JP", {
-              year: "numeric",
-              month: "2-digit",
-              day: "2-digit",
-              hour: "2-digit",
-              minute: "2-digit"
-            });
-          } else {
-            timeText = "（送信中…）";
-          }
-
-          const div = document.createElement("div");
-          div.className = "list-item";
-          div.textContent = `${data.name}（${timeText}）`;
-          container.appendChild(div);
-
-          if (data.name === username) alreadyRead = true;
-        });
-
-        readBtn.disabled = alreadyRead;
-        readBtn.textContent = alreadyRead ? "読了済み" : "読みました";
+      .doc(username)
+      .set({
+        name: username,
+        time: firebase.firestore.FieldValue.serverTimestamp()
       });
+  };
 
-    /* ===== 読みました ===== */
-    readBtn.onclick = async () => {
+  /* Admin（ローカル） */
+  document.getElementById("startInput").value = startDate;
 
-      if (!username) return alert("名前を入力してください");
-      if (readBtn.disabled) return;
-
-      await db.collection("reads")
-        .doc(dateKey)
-        .collection("users")
-        .doc(username)
-        .set({
-          name: username,
-          time: firebase.firestore.FieldValue.serverTimestamp()
-        });
-    };
-
-    /* ===== Admin ===== */
-    document.getElementById("startInput").value = startDate;
-
-    document.getElementById("saveStart").onclick = async () => {
-      let pass = prompt("パスワード");
-      if(pass !== "JesusChrist"){
-        alert("違います");
-        return;
-      }
-
-      let newDate = document.getElementById("startInput").value;
-      if(!newDate) return;
-
-      await db.collection("config").doc("global").set({
-        startDate: newDate
-      });
-
-      location.reload();
-    };
-
-  });
-
+  document.getElementById("saveStart").onclick = ()=>{
+    let pass = prompt("パスワード");
+    if(pass !== "JesusChrist"){
+      alert("違います");
+      return;
+    }
+    let newDate = document.getElementById("startInput").value;
+    if(!newDate) return;
+    localStorage.setItem("startDate", newDate);
+    location.reload();
+  };
 }
 
-/* ===== タブ ===== */
+/* タブ */
 document.querySelectorAll("nav button").forEach(btn=>{
  btn.onclick = ()=>{
    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
