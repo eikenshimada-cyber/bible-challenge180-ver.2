@@ -112,7 +112,6 @@ nav button { flex:1; border:none; background:none; font-size:14px; }
   const app = initializeApp(firebaseConfig);
   const analytics = getAnalytics(app);
 </script>
-
 /* ===== CSV ===== */
 fetch("./plan.csv?ver=" + Date.now())
 .then(res => res.text())
