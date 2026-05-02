@@ -245,13 +245,13 @@ await db.collection("reads")
     console.log("親OK");
 
     await db.collection("reads")
-      .doc(dateKey)
-      .collection("users")
-      .doc(username)
-      .set({
-        name: username,
-        time: new Date()
-      });
+  .doc(dateKey)
+  .collection("users")  // 
+  .doc(username)
+  .set({
+    name: username,
+    time: new Date()
+  });
 
     console.log("ユーザーOK");
 
