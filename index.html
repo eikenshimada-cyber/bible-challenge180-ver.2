@@ -221,19 +221,23 @@ if (data.time) {
     });
 
   /* ボタン */
-  readBtn.onclick = async () => {
+ readBtn.onclick = async () => {
 
-    if (!username) return;
-    if (readBtn.disabled) return;
+  if (!username) return;
+  if (readBtn.disabled) return;
 
-    await db.collection("reads")
-      .doc(dateKey)
-      .collection("users")
-      .doc(username)
-      .set({
-        name: username,
-       time: new Date()
-      });
+  await db.collection("reads")
+    .doc(dateKey)
+    .collection("users")
+    .doc(username)
+    .set({
+      name: username,
+      time: new Date()
+    });
+
+  // 👇これ追加
+  localStorage.setItem("read_" + dateKey, "true");
+};
   };
 
   /* Admin（ローカル） */
