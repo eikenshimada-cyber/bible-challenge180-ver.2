@@ -232,6 +232,14 @@ await db.collection("reads")
   if (!username) return;
   if (readBtn.disabled) return;
 
+  // 🔥 ① 親を必ず作る
+  await db.collection("reads")
+    .doc(dateKey)
+    .set({
+      updatedAt: new Date()
+    }, { merge: true });
+
+  // 🔥 ② ユーザー保存
   await db.collection("reads")
     .doc(dateKey)
     .collection("users")
@@ -241,7 +249,6 @@ await db.collection("reads")
       time: new Date()
     });
 
-  // 👇これ追加
   localStorage.setItem("read_" + dateKey, "true");
 };
   
