@@ -227,15 +227,25 @@ await db.collection("reads")
     });
 
   /* ボタン */
- readBtn.onclick = async () => {
+ /* ===== 読みましたボタン（完全版） ===== */
+readBtn.onclick = async () => {
 
   try {
 
-    console.log("開始", dateKey);
+    // ===== 基本チェック =====
+    if (!username) {
+      alert("名前を入力してください");
+      return;
+    }
 
-    if (!username) return;
     if (readBtn.disabled) return;
 
+    // ===== 日付キー（日本時間） =====
+    const dateKey = new Date().toLocaleDateString("sv-SE");
+
+    console.log("開始", dateKey);
+
+    // ===== 親ドキュメント作成 =====
     await db.collection("reads")
       .doc(dateKey)
       .set({
@@ -244,22 +254,30 @@ await db.collection("reads")
 
     console.log("親OK");
 
+    // ===== ユーザー保存 =====
     await db.collection("reads")
-  .doc(dateKey)
-  .collection("users")  // 
-  .doc(username)
-  .set({
-    name: username,
-    time: new Date()
-  });
+      .doc(dateKey)
+      .collection("users")
+      .doc(username)
+      .set({
+        name: username,
+        time: new Date()
+      });
 
     console.log("ユーザーOK");
 
+    // ===== ローカル保存（再読み込み対策） =====
     localStorage.setItem("read_" + dateKey, "true");
 
-  } catch(e) {
+    // ===== ボタン状態更新 =====
+    readBtn.disabled = true;
+    readBtn.textContent = "読了済み";
+
+  } catch (e) {
+
     console.error("エラー:", e);
-    alert("保存エラー");
+    alert("保存に失敗しました");
+
   }
 
 };
