@@ -201,7 +201,7 @@ function init(plan){
       .doc(username)
       .set({
         name: username,
-        time: firebase.firestore.FieldValue.serverTimestamp()
+       time: new Date()
       });
   };
 
