@@ -165,17 +165,32 @@ function init(plan){
       snapshot.forEach(doc => {
         const data = doc.data();
 
-        let timeText = "";
+       let timeText = "";
 
-        if (data.time && data.time.toDate) {
-          const d = data.time.toDate();
-          timeText = d.toLocaleString("ja-JP", {
-            year:"numeric",month:"2-digit",day:"2-digit",
-            hour:"2-digit",minute:"2-digit"
-          });
-        } else {
-          timeText = "（送信中…）";
-        }
+if (data.time) {
+
+  let d;
+
+  // Firestore Timestamp
+  if (data.time.toDate) {
+    d = data.time.toDate();
+  } 
+  // JS Date
+  else {
+    d = new Date(data.time);
+  }
+
+  timeText = d.toLocaleString("ja-JP", {
+    year:"numeric",
+    month:"2-digit",
+    day:"2-digit",
+    hour:"2-digit",
+    minute:"2-digit"
+  });
+
+} else {
+  timeText = "（送信中…）";
+}
 
         const div = document.createElement("div");
         div.className = "list-item";
