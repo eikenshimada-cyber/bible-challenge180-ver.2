@@ -85,21 +85,21 @@ nav button { flex:1; border:none; background:none; font-size:14px; }
   <button data-tab="admin">Admin</button>
 </nav>
 
-<!-- Firebase v8 -->
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
 <script>
-
-/* ===== Firebase ===== */
 const firebaseConfig = {
-  apiKey: "ここに貼る",
-  authDomain: "ここに貼る",
-  projectId: "ここに貼る"
+  apiKey: "あなたのキー",
+  authDomain: "あなたのドメイン",
+  projectId: "あなたのID"
 };
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
 
+firebase.initializeApp(firebaseConfig);
+
+const db = firebase.firestore();
+</script>
 /* ===== CSV ===== */
 fetch("./plan.csv?ver=" + Date.now())
 .then(res => res.text())
