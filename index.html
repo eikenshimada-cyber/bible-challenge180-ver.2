@@ -229,27 +229,39 @@ await db.collection("reads")
   /* ボタン */
  readBtn.onclick = async () => {
 
-  if (!username) return;
-  if (readBtn.disabled) return;
+  try {
 
-  // 🔥 ① 親を必ず作る
-  await db.collection("reads")
-    .doc(dateKey)
-    .set({
-      updatedAt: new Date()
-    }, { merge: true });
+    console.log("開始", dateKey);
 
-  // 🔥 ② ユーザー保存
-  await db.collection("reads")
-    .doc(dateKey)
-    .collection("users")
-    .doc(username)
-    .set({
-      name: username,
-      time: new Date()
-    });
+    if (!username) return;
+    if (readBtn.disabled) return;
 
-  localStorage.setItem("read_" + dateKey, "true");
+    await db.collection("reads")
+      .doc(dateKey)
+      .set({
+        updatedAt: new Date()
+      }, { merge: true });
+
+    console.log("親OK");
+
+    await db.collection("reads")
+      .doc(dateKey)
+      .collection("users")
+      .doc(username)
+      .set({
+        name: username,
+        time: new Date()
+      });
+
+    console.log("ユーザーOK");
+
+    localStorage.setItem("read_" + dateKey, "true");
+
+  } catch(e) {
+    console.error("エラー:", e);
+    alert("保存エラー");
+  }
+
 };
   
 
