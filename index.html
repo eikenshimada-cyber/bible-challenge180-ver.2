@@ -191,9 +191,10 @@ db.collection("reads")
            
       // 👇 ここを変更（get → onSnapshot）
       db.collection("reads")
-        .doc(date)
-        .collection("users")
-        .onSnapshot(users => {
+      .doc(date)
+      .collection("users")
+      .orderBy("time") // 👈 追加
+      .onSnapshot(users => {
 
           users.forEach(userDoc => {
             const data = userDoc.data();
