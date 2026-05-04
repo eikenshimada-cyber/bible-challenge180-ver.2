@@ -174,34 +174,53 @@ function init(plan) {
     `${dayIndex+1}/180 日目`;
 
   // ===== 読了者表示 =====
-  db.collection("reads")
-    .doc(dateKey)
-    .collection("users")
-    .onSnapshot(snapshot => {
+ /* ===== 履歴表示（全日分） ===== */
+db.collection("reads")
+  .orderBy(firebase.firestore.FieldPath.documentId())
+  .onSnapshot(snapshot => {
 
-      const container = document.getElementById("readers");
-      container.innerHTML = "";
+    const container = document.getElementById("readers");
+    container.innerHTML = "";
 
-      let alreadyRead = false;
+   let alreadyRead = false;
+   snapshot.forEach(doc => {
 
-      snapshot.forEach(doc => {
-        const data = doc.data();
+      const date = doc.id;
 
-        let d = data.time && data.time.toDate
-          ? data.time.toDate()
-          : new Date(data.time);
+      // 日付タイトル
+      const title = document.createElement("div");
+      title.textContent = "■ " + date;
+      title.style.fontWeight = "bold";
+      container.appendChild(title);
 
-        const div = document.createElement("div");
-        div.className = "list-item";
-        div.textContent = `${data.name}（${d.toLocaleString("ja-JP")}）`;
-        container.appendChild(div);
+      // 各ユーザー
+      db.collection("reads")
+  .doc(date)
+  .collection("users")
+  .get()
+  .then(users => {
 
-        if (data.name === username) alreadyRead = true;
-      });
+    users.forEach(userDoc => {
+      const data = userDoc.data();
 
-      readBtn.disabled = alreadyRead;
-      readBtn.textContent = alreadyRead ? "読了済み" : "読みました";
+      let d = data.time && data.time.toDate
+        ? data.time.toDate()
+        : new Date(data.time);
+
+      const div = document.createElement("div");
+      div.textContent = `・${data.name}（${d.toLocaleString("ja-JP")}）`;
+      container.appendChild(div);
+
+      if (date === dateKey && data.name === username) {
+        alreadyRead = true;
+      }
     });
+
+    // 👇ここに入れる（これが正解）
+    readBtn.disabled = alreadyRead;
+    readBtn.textContent = alreadyRead ? "読了済み" : "読みました";
+
+  });
 
   // ===== ボタン =====
   readBtn.onclick = async () => {
