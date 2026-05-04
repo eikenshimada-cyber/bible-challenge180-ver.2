@@ -188,12 +188,7 @@ db.collection("reads")
 
       const date = doc.id;
 
-      // 日付タイトル
-      const title = document.createElement("div");
-      title.textContent = "■ " + date;
-      title.style.fontWeight = "bold";
-      container.appendChild(title);
-
+           
       // 👇 ここを変更（get → onSnapshot）
       db.collection("reads")
         .doc(date)
