@@ -124,39 +124,45 @@ fetch("./plan.csv?ver=" + Date.now())
 
 });
 
-/* ===== init ===== */
-function init(plan){
+/* ===== init（ズレ対策済み） ===== */
+function init(plan) {
 
-  let startDate = localStorage.getItem("startDate") || new Date().toISOString().slice(0,10);
-  localStorage.setItem("startDate", startDate);
+  // ===== 日本時間で統一 =====
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
 
- const today = new Date();
-const dateKey = today.toLocaleDateString("sv-SE");
-
-  function calcDayIndex(){
-    return Math.min(179, Math.floor((today - new Date(startDate)) / 86400000));
+  // ===== 開始日 =====
+  let startDate = localStorage.getItem("startDate");
+  if (!startDate) {
+    startDate = now.toISOString().slice(0, 10);
+    localStorage.setItem("startDate", startDate);
   }
 
-  const dayIndex = calcDayIndex();
+  // ===== 日付キー =====
+  const dateKey = now.toLocaleDateString("sv-SE");
 
-  document.getElementById("todayRef").textContent = plan[dayIndex] || "完了";
-  document.getElementById("todayDate").textContent = today.toLocaleDateString("ja-JP");
+  // ===== 日数計算 =====
+  const diffDays = Math.floor((now - new Date(startDate)) / 86400000);
+  const dayIndex = Math.max(0, Math.min(179, diffDays));
 
+  // ===== 今日の表示 =====
+  document.getElementById("todayRef").textContent =
+    plan[dayIndex] || "完了";
+
+  document.getElementById("todayDate").textContent =
+    now.toLocaleDateString("ja-JP");
+
+  // ===== 全体リスト =====
   document.getElementById("allPlan").innerHTML =
-    plan.map((p,i)=>`Day${i+1}: ${p}`).join("<br>");
+    plan.map((p, i) => `Day${i + 1}: ${p}`).join("<br>");
 
-  document.getElementById("bar").style.width = ((dayIndex+1)/180*100)+"%";
-  document.getElementById("progressText").textContent = `${dayIndex+1}/180 日`;
+  // ===== 進捗バー =====
+  document.getElementById("bar").style.width =
+    ((dayIndex + 1) / 180 * 100) + "%";
 
-  /* 名前 */
-  let username = localStorage.getItem("username");
-  if (!username) {
-    username = prompt("名前を入力してください");
-    if (username) localStorage.setItem("username", username);
-  }
+  document.getElementById("progressText").textContent =
+    `${dayIndex + 1}/180 日目`;
 
-  const readBtn = document.getElementById("readBtn");
-
+}
   /* 表示 */
   db.collection("reads")
     .doc(dateKey)
