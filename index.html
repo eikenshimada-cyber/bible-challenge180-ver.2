@@ -124,11 +124,20 @@ fetch("./plan.csv?ver=" + Date.now())
 
 });
 
-/* ===== init（ズレ対策済み） ===== */
 function init(plan) {
 
-  // ===== 日本時間で統一 =====
+  // ===== 必須定義 =====
+  const readBtn = document.getElementById("readBtn");
+
+  let username = localStorage.getItem("username");
+  if (!username) {
+    username = prompt("名前を入力してください");
+    if (username) localStorage.setItem("username", username);
+  }
+
+  // ===== 日付（日本時間） =====
   const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+  const dateKey = now.toLocaleDateString("sv-SE");
 
   // ===== 開始日 =====
   let startDate = localStorage.getItem("startDate");
@@ -137,33 +146,24 @@ function init(plan) {
     localStorage.setItem("startDate", startDate);
   }
 
-  // ===== 日付キー =====
-  const dateKey = now.toLocaleDateString("sv-SE");
-
   // ===== 日数計算 =====
   const diffDays = Math.floor((now - new Date(startDate)) / 86400000);
   const dayIndex = Math.max(0, Math.min(179, diffDays));
 
-  // ===== 今日の表示 =====
-  document.getElementById("todayRef").textContent =
-    plan[dayIndex] || "完了";
+  // ===== 表示 =====
+  document.getElementById("todayRef").textContent = plan[dayIndex] || "完了";
+  document.getElementById("todayDate").textContent = now.toLocaleDateString("ja-JP");
 
-  document.getElementById("todayDate").textContent =
-    now.toLocaleDateString("ja-JP");
-
-  // ===== 全体リスト =====
   document.getElementById("allPlan").innerHTML =
-    plan.map((p, i) => `Day${i + 1}: ${p}`).join("<br>");
+    plan.map((p,i)=>`Day${i+1}: ${p}`).join("<br>");
 
-  // ===== 進捗バー =====
   document.getElementById("bar").style.width =
-    ((dayIndex + 1) / 180 * 100) + "%";
+    ((dayIndex+1)/180*100)+"%";
 
   document.getElementById("progressText").textContent =
-    `${dayIndex + 1}/180 日目`;
+    `${dayIndex+1}/180 日目`;
 
-}
-  /* 表示 */
+  // ===== 読了者表示 =====
   db.collection("reads")
     .doc(dateKey)
     .collection("users")
@@ -177,96 +177,32 @@ function init(plan) {
       snapshot.forEach(doc => {
         const data = doc.data();
 
-       let timeText = "";
-
-if (data.time) {
-
-  let d;
-
-  // Firestore Timestamp
-  if (data.time.toDate) {
-    d = data.time.toDate();
-  } 
-  // JS Date
-  else {
-    d = new Date(data.time);
-  }
-
-  timeText = d.toLocaleString("ja-JP", {
-    year:"numeric",
-    month:"2-digit",
-    day:"2-digit",
-    hour:"2-digit",
-    minute:"2-digit"
-  });
-
-} else {
-  timeText = "（送信中…）";
-}
+        let d = data.time && data.time.toDate
+          ? data.time.toDate()
+          : new Date(data.time);
 
         const div = document.createElement("div");
         div.className = "list-item";
-        div.textContent = `${data.name}（${timeText}）`;
+        div.textContent = `${data.name}（${d.toLocaleString("ja-JP")}）`;
         container.appendChild(div);
 
-       readBtn.onclick = async () => {
-
-  if (!username) return;
-  if (readBtn.disabled) return;
-
-  await db.collection("reads")
-  .doc(dateKey)
-  .set({
-    updatedAt: new Date()
-  }, { merge: true }); // 👈これ重要
-
-await db.collection("reads")
-  .doc(dateKey)
-  .collection("users")
-  .doc(username)
-  .set({
-    name: username,
-    time: new Date()
-  });
-
-  // 👇これ追加
-  localStorage.setItem("read_" + dateKey, "true");
-};
+        if (data.name === username) alreadyRead = true;
       });
 
       readBtn.disabled = alreadyRead;
       readBtn.textContent = alreadyRead ? "読了済み" : "読みました";
     });
 
-  /* ボタン */
- /* ===== 読みましたボタン（完全版） ===== */
-readBtn.onclick = async () => {
+  // ===== ボタン =====
+  readBtn.onclick = async () => {
 
-  try {
-
-    // ===== 基本チェック =====
-    if (!username) {
-      alert("名前を入力してください");
-      return;
-    }
-
+    if (!username) return;
     if (readBtn.disabled) return;
 
-    // ===== 日付キー（日本時間） =====
-    const dateKey = new Date().toLocaleDateString("sv-SE");
-
-    console.log("開始", dateKey);
-
-    // ===== 親ドキュメント作成 =====
     await db.collection("reads")
       .doc(dateKey)
-      .set({
-        updatedAt: new Date()
-      }, { merge: true });
+      .set({ updatedAt: new Date() }, { merge: true });
 
-    console.log("親OK");
-
-    // ===== ユーザー保存 =====
     await db.collection("reads")
       .doc(dateKey)
       .collection("users")
@@ -276,26 +212,10 @@ readBtn.onclick = async () => {
         time: new Date()
       });
 
-    console.log("ユーザーOK");
-
-    // ===== ローカル保存（再読み込み対策） =====
     localStorage.setItem("read_" + dateKey, "true");
+  };
 
-    // ===== ボタン状態更新 =====
-    readBtn.disabled = true;
-    readBtn.textContent = "読了済み";
-
-  } catch (e) {
-
-    console.error("エラー:", e);
-    alert("保存に失敗しました");
-
-  }
-
-};
-  
-
-  /* Admin（ローカル） */
+  // ===== Admin =====
   document.getElementById("startInput").value = startDate;
 
   document.getElementById("saveStart").onclick = ()=>{
