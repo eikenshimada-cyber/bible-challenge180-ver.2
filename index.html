@@ -191,8 +191,7 @@ db.collection("reads")
            
       // 👇 ここを変更（get → onSnapshot）
       db.collectionGroup("users")
-  .orderBy("timestamp", "desc")
-  .onSnapshot(snapshot => {
+    .onSnapshot(snapshot => {
 
     const container = document.getElementById("readers");
     container.innerHTML = "";
