@@ -193,7 +193,7 @@ db.collection("reads")
       db.collection("reads")
       .doc(date)
       .collection("users")
-      .orderBy("time") // 👈 追加
+     .orderBy("time", "desc")
       .onSnapshot(users => {
 
           users.forEach(userDoc => {
