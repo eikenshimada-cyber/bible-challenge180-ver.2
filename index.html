@@ -175,34 +175,19 @@ function init(plan) {
 
   // ===== 読了者表示 =====
 /* ===== 履歴表示（全日） ===== */
-db.collection("reads")
-  .orderBy(firebase.firestore.FieldPath.documentId())
+db.collectionGroup("users")
   .onSnapshot(snapshot => {
 
     const container = document.getElementById("readers");
     container.innerHTML = "";
 
     let alreadyRead = false;
-
-    snapshot.forEach(doc => {
-
-      const date = doc.id;
-
-           
-      // 👇 ここを変更（get → onSnapshot）
-      db.collectionGroup("users")
-    .onSnapshot(snapshot => {
-
-    const container = document.getElementById("readers");
-    container.innerHTML = "";
-    
-    let alreadyRead = false;
+    let list = [];
 
     snapshot.forEach(doc => {
       const data = doc.data();
 
       let d;
-
       if (data.timestamp && data.timestamp.toDate) {
         d = data.timestamp.toDate();
       } else if (data.time && data.time.toDate) {
@@ -210,26 +195,36 @@ db.collection("reads")
       } else if (data.time) {
         d = new Date(data.time);
       } else {
-        d = new Date(); // 最後の保険
+        d = new Date(0); // ← ここ重要（最古扱い）
       }
 
-      const div = document.createElement("div");
-      div.textContent = `・${data.name}（${d.toLocaleString("ja-JP")}）`;
-      container.appendChild(div);
+      list.push({
+        name: data.name,
+        date: d,
+        doc: doc
+      });
+
+      // 今日判定
       if (doc.ref.parent.parent.id === dateKey && data.name === username) {
         alreadyRead = true;
       }
-
-     });
-
-          // 👇ここで更新
-          readBtn.disabled = alreadyRead;
-          readBtn.textContent = alreadyRead ? "読了済み" : "読みました";
-        });
-
     });
 
+    // 👇これが核心（新しい順）
+    list.sort((a, b) => b.date - a.date);
+
+    // 表示
+    list.forEach(item => {
+      const div = document.createElement("div");
+      div.textContent = `・${item.name}（${item.date.toLocaleString("ja-JP")}）`;
+      container.appendChild(div);
+    });
+
+    readBtn.disabled = alreadyRead;
+    readBtn.textContent = alreadyRead ? "読了済み" : "読みました";
+
   });
+
   // ===== ボタン =====
   readBtn.onclick = async () => {
 
