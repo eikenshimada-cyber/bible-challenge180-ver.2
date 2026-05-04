@@ -190,27 +190,28 @@ db.collection("reads")
 
            
       // 👇 ここを変更（get → onSnapshot）
-      db.collection("reads")
-      .doc(date)
-      .collection("users")
-      .orderBy("time", "desc")
-      .onSnapshot(users => {
+      db.collectionGroup("users")
+  .orderBy("timestamp", "desc")
+  .onSnapshot(snapshot => {
 
-          users.forEach(userDoc => {
-            const data = userDoc.data();
+    const container = document.getElementById("readers");
+    container.innerHTML = "";
 
-            let d = data.time && data.time.toDate
-              ? data.time.toDate()
-              : new Date(data.time);
+    snapshot.forEach(doc => {
+      const data = doc.data();
 
-            const div = document.createElement("div");
-            div.textContent = `・${data.name}（${d.toLocaleString("ja-JP")}）`;
-            container.appendChild(div);
+      let d = data.timestamp && data.timestamp.toDate
+        ? data.timestamp.toDate()
+        : new Date(data.time);
 
-            if (date === dateKey && data.name === username) {
-              alreadyRead = true;
-            }
-          });
+      const div = document.createElement("div");
+      div.textContent = `・${data.name}（${d.toLocaleString("ja-JP")}）`;
+      container.appendChild(div);
+      if (doc.ref.parent.parent.id === dateKey && data.name === username) {
+        alreadyRead = true;
+      }
+
+     });
 
           // 👇ここで更新
           readBtn.disabled = alreadyRead;
@@ -236,7 +237,8 @@ db.collection("reads")
       .doc(username)
       .set({
         name: username,
-        time: new Date()
+        time: new Date(),
+        timestamp: firebase.firestore.FieldValue.serverTimestamp() // 👈追加
       });
 
     localStorage.setItem("read_" + dateKey, "true");
