@@ -195,13 +195,23 @@ db.collection("reads")
 
     const container = document.getElementById("readers");
     container.innerHTML = "";
+    
+    let alreadyRead = false;
 
     snapshot.forEach(doc => {
       const data = doc.data();
 
-      let d = data.timestamp && data.timestamp.toDate
-        ? data.timestamp.toDate()
-        : new Date(data.time);
+      let d;
+
+      if (data.timestamp && data.timestamp.toDate) {
+        d = data.timestamp.toDate();
+      } else if (data.time && data.time.toDate) {
+        d = data.time.toDate();
+      } else if (data.time) {
+        d = new Date(data.time);
+      } else {
+        d = new Date(); // 最後の保険
+      }
 
       const div = document.createElement("div");
       div.textContent = `・${data.name}（${d.toLocaleString("ja-JP")}）`;
