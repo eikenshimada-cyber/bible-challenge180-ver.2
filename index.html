@@ -151,7 +151,11 @@ async function init(plan) {
   );
   const dateKey = now.toLocaleDateString("sv-SE");
 
-  // ===== startDate（Firestore共有）=====
+  function toJSTDate(str) {
+  const [y, m, d] = str.split("-");
+  return new Date(Number(y), Number(m) - 1, Number(d));
+}
+// ===== startDate（Firestore共有）=====
   const configDoc = await db.collection("settings").doc("config").get();
 
   if (!configDoc.exists || !configDoc.data().startDate) {
@@ -164,7 +168,7 @@ async function init(plan) {
 
   // ===== 日数計算 =====
   const diffDays = Math.floor(
-    (now - new Date(startDate)) / 86400000
+   (now - toJSTDate(startDate)) / 86400000
   );
   const dayIndex = Math.max(0, Math.min(179, diffDays));
 
@@ -275,7 +279,7 @@ async function init(plan) {
 }
 
   // ===== Admin =====
- // ===== Admin（Firestore版） =====
+// ===== Admin（Firestore版） =====
 
 // 表示（Firestoreから取得）
 (async () => {
@@ -298,7 +302,11 @@ document.getElementById("saveStart").onclick = async () => {
   let newDate = document.getElementById("startInput").value;
   if (!newDate) return;
 
-  // 👇 追加（確認）
+  // 👇 追加：日付を安全に補正（これが修正）
+  const [y, m, d] = newDate.split("-");
+  const safeDate = `${y}-${m}-${d}`; // 形式固定（そのまま使う）
+
+  // 👇 確認
   const ok = confirm(
     "開始日を変更すると、これまでの読了記録はすべて削除されます。\n実行しますか？"
   );
@@ -307,7 +315,7 @@ document.getElementById("saveStart").onclick = async () => {
   try {
     // ===== 開始日保存 =====
     await db.collection("settings").doc("config").set({
-      startDate: newDate
+      startDate: safeDate
     });
 
     // ===== 全読了データ削除 =====
@@ -328,7 +336,6 @@ document.getElementById("saveStart").onclick = async () => {
 
       await batch.commit();
 
-      // 親ドキュメント削除
       await db.collection("reads").doc(doc.id).delete();
     }
 
@@ -340,7 +347,6 @@ document.getElementById("saveStart").onclick = async () => {
     alert("エラーが発生しました");
   }
 };
-
 /* タブ */
 document.querySelectorAll("nav button").forEach(btn=>{
  btn.onclick = ()=>{
