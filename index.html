@@ -134,7 +134,7 @@ fetch("./plan.csv?ver=" + Date.now())
 
 });
 
-function init(plan) {
+async function init(plan) {
 
   // ===== 必須定義 =====
   const readBtn = document.getElementById("readBtn");
@@ -145,24 +145,35 @@ function init(plan) {
     if (username) localStorage.setItem("username", username);
   }
 
-  // ===== 日付（日本時間） =====
-  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+  // ===== 日付（日本時間）=====
+  const now = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" })
+  );
   const dateKey = now.toLocaleDateString("sv-SE");
 
-  // ===== 開始日 =====
-  let startDate = localStorage.getItem("startDate");
-  if (!startDate) {
-    startDate = now.toISOString().slice(0, 10);
-    localStorage.setItem("startDate", startDate);
+  // ===== startDate（Firestore共有）=====
+  const configDoc = await db.collection("settings").doc("config").get();
+
+  if (!configDoc.exists || !configDoc.data().startDate) {
+    document.getElementById("todayRef").textContent =
+      "開始日を設定してください（Admin）";
+    return;
   }
 
+  const startDate = configDoc.data().startDate;
+
   // ===== 日数計算 =====
-  const diffDays = Math.floor((now - new Date(startDate)) / 86400000);
+  const diffDays = Math.floor(
+    (now - new Date(startDate)) / 86400000
+  );
   const dayIndex = Math.max(0, Math.min(179, diffDays));
 
   // ===== 表示 =====
-  document.getElementById("todayRef").textContent = plan[dayIndex] || "完了";
-  document.getElementById("todayDate").textContent = now.toLocaleDateString("ja-JP");
+  document.getElementById("todayRef").textContent =
+    plan[dayIndex] || "完了";
+
+  document.getElementById("todayDate").textContent =
+    now.toLocaleDateString("ja-JP");
 
   document.getElementById("allPlan").innerHTML =
     plan.map((p,i)=>`Day${i+1}: ${p}`).join("<br>");
@@ -173,59 +184,54 @@ function init(plan) {
   document.getElementById("progressText").textContent =
     `${dayIndex+1}/180 日目`;
 
-  // ===== 読了者表示 =====
-/* ===== 履歴表示（全日） ===== */
-db.collectionGroup("users")
-  .onSnapshot(snapshot => {
+  // ===== 読了者表示（そのまま）=====
+  db.collectionGroup("users")
+    .onSnapshot(snapshot => {
 
-    const container = document.getElementById("readers");
-    container.innerHTML = "";
+      const container = document.getElementById("readers");
+      container.innerHTML = "";
 
-    let alreadyRead = false;
-    let list = [];
+      let alreadyRead = false;
+      let list = [];
 
-    snapshot.forEach(doc => {
-      const data = doc.data();
+      snapshot.forEach(doc => {
+        const data = doc.data();
 
-      let d;
-      if (data.timestamp && data.timestamp.toDate) {
-        d = data.timestamp.toDate();
-      } else if (data.time && data.time.toDate) {
-        d = data.time.toDate();
-      } else if (data.time) {
-        d = new Date(data.time);
-      } else {
-        d = new Date(0); // ← ここ重要（最古扱い）
-      }
+        let d;
+        if (data.timestamp && data.timestamp.toDate) {
+          d = data.timestamp.toDate();
+        } else if (data.time && data.time.toDate) {
+          d = data.time.toDate();
+        } else if (data.time) {
+          d = new Date(data.time);
+        } else {
+          d = new Date(0);
+        }
 
-      list.push({
-        name: data.name,
-        date: d,
-        doc: doc
+        list.push({
+          name: data.name,
+          date: d,
+          doc: doc
+        });
+
+        if (doc.ref.parent.parent.id === dateKey && data.name === username) {
+          alreadyRead = true;
+        }
       });
 
-      // 今日判定
-      if (doc.ref.parent.parent.id === dateKey && data.name === username) {
-        alreadyRead = true;
-      }
+      list.sort((a, b) => b.date - a.date);
+
+      list.forEach(item => {
+        const div = document.createElement("div");
+        div.textContent = `・${item.name}（${item.date.toLocaleString("ja-JP")}）`;
+        container.appendChild(div);
+      });
+
+      readBtn.disabled = alreadyRead;
+      readBtn.textContent = alreadyRead ? "読了済み" : "読みました";
     });
 
-    // 👇これが核心（新しい順）
-    list.sort((a, b) => b.date - a.date);
-
-    // 表示
-    list.forEach(item => {
-      const div = document.createElement("div");
-      div.textContent = `・${item.name}（${item.date.toLocaleString("ja-JP")}）`;
-      container.appendChild(div);
-    });
-
-    readBtn.disabled = alreadyRead;
-    readBtn.textContent = alreadyRead ? "読了済み" : "読みました";
-
-  });
-
-  // ===== ボタン =====
+  // ===== ボタン（そのまま）=====
   readBtn.onclick = async () => {
 
     if (!username) return;
@@ -242,27 +248,64 @@ db.collectionGroup("users")
       .set({
         name: username,
         time: new Date(),
-        timestamp: firebase.firestore.FieldValue.serverTimestamp() // 👈追加
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
       });
 
     localStorage.setItem("read_" + dateKey, "true");
   };
 
-  // ===== Admin =====
-  document.getElementById("startInput").value = startDate;
+  // ===== 0時ちょうど更新 =====
+  (function scheduleMidnightReload(){
 
-  document.getElementById("saveStart").onclick = ()=>{
-    let pass = prompt("パスワード");
-    if(pass !== "JesusChrist"){
-      alert("違います");
-      return;
-    }
-    let newDate = document.getElementById("startInput").value;
-    if(!newDate) return;
-    localStorage.setItem("startDate", newDate);
-    location.reload();
-  };
+    const nowJST = new Date(
+      new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" })
+    );
+
+    const next = new Date(nowJST);
+    next.setHours(24,0,0,0);
+
+    const ms = next - nowJST;
+
+    setTimeout(() => {
+      location.reload();
+    }, ms);
+
+  })();
+
 }
+
+  // ===== Admin =====
+ // ===== Admin（Firestore版） =====
+
+// 表示（Firestoreから取得）
+(async () => {
+  const doc = await db.collection("settings").doc("config").get();
+
+  if (doc.exists && doc.data().startDate) {
+    document.getElementById("startInput").value = doc.data().startDate;
+  }
+})();
+
+// 保存（見た目そのまま）
+document.getElementById("saveStart").onclick = async () => {
+
+  let pass = prompt("パスワード");
+  if (pass !== "JesusChrist") {
+    alert("違います");
+    return;
+  }
+
+  let newDate = document.getElementById("startInput").value;
+  if (!newDate) return;
+
+  // 👇ここだけ変更（localStorage → Firestore）
+  await db.collection("settings").doc("config").set({
+    startDate: newDate
+  });
+
+  alert("保存しました");
+  location.reload();
+};
 
 /* タブ */
 document.querySelectorAll("nav button").forEach(btn=>{
