@@ -298,13 +298,47 @@ document.getElementById("saveStart").onclick = async () => {
   let newDate = document.getElementById("startInput").value;
   if (!newDate) return;
 
-  // 👇ここだけ変更（localStorage → Firestore）
-  await db.collection("settings").doc("config").set({
-    startDate: newDate
-  });
+  // 👇 追加（確認）
+  const ok = confirm(
+    "開始日を変更すると、これまでの読了記録はすべて削除されます。\n実行しますか？"
+  );
+  if (!ok) return;
 
-  alert("保存しました");
-  location.reload();
+  try {
+    // ===== 開始日保存 =====
+    await db.collection("settings").doc("config").set({
+      startDate: newDate
+    });
+
+    // ===== 全読了データ削除 =====
+    const readsSnapshot = await db.collection("reads").get();
+
+    for (const doc of readsSnapshot.docs) {
+
+      const usersSnapshot = await db.collection("reads")
+        .doc(doc.id)
+        .collection("users")
+        .get();
+
+      const batch = db.batch();
+
+      usersSnapshot.forEach(userDoc => {
+        batch.delete(userDoc.ref);
+      });
+
+      await batch.commit();
+
+      // 親ドキュメント削除
+      await db.collection("reads").doc(doc.id).delete();
+    }
+
+    alert("保存しました（読了記録もリセットされました）");
+    location.reload();
+
+  } catch (e) {
+    console.error(e);
+    alert("エラーが発生しました");
+  }
 };
 
 /* タブ */
