@@ -236,27 +236,45 @@ async function init(plan) {
     });
 
   // ===== ボタン（そのまま）=====
-  readBtn.onclick = async () => {
+ readBtn.onclick = async () => {
 
-    if (!username) return;
-    if (readBtn.disabled) return;
+  if (!username) return;
+  if (readBtn.disabled) return;
 
-    await db.collection("reads")
-      .doc(dateKey)
-      .set({ updatedAt: new Date() }, { merge: true });
+  // ===== 今日すでに読んだかチェック =====
+  const snapshot = await db.collection("reads")
+    .doc(dateKey)
+    .collection("users")
+    .where("name", "==", username)
+    .get();
 
-    await db.collection("reads")
-      .doc(dateKey)
-      .collection("users")
-      .doc(username)
-      .set({
-        name: username,
-        time: new Date(),
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-      });
+  if (!snapshot.empty) {
+    alert("今日はすでに読了しています");
+    readBtn.disabled = true;
+    readBtn.textContent = "読了済み";
+    return;
+  }
 
-    localStorage.setItem("read_" + dateKey, "true");
-  };
+  // ===== 保存 =====
+  await db.collection("reads")
+    .doc(dateKey)
+    .set({ updatedAt: new Date() }, { merge: true });
+
+  await db.collection("reads")
+    .doc(dateKey)
+    .collection("users")
+    .add({
+      name: username,
+      time: new Date(),
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+  // ===== UI反映 =====
+  readBtn.disabled = true;
+  readBtn.textContent = "読了済み";
+
+  localStorage.setItem("read_" + dateKey, "true");
+};
 
   // ===== 0時ちょうど更新 =====
   (function scheduleMidnightReload(){
