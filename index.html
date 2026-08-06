@@ -156,17 +156,10 @@ async function init(plan) {
 
   if (userNameDisplay) userNameDisplay.textContent = username || "未設定";
 
-  // ===== 名前エイリアス（旧名前→新名前）を読み込み =====
+  // ===== 名前エイリアス（旧名前→新名前）は settings/config に格納する =====
+  // (専用コレクションだと書き込み権限がなく失敗するため、既に書き込み許可されている
+  //  settings/config ドキュメントの中の nameAliases フィールドを使う)
   let nameAliasMap = {};
-  try {
-    const aliasSnapshot = await db.collection("nameAliases").get();
-    aliasSnapshot.forEach(doc => {
-      const d = doc.data();
-      if (d.oldName && d.newName) nameAliasMap[d.oldName] = d.newName;
-    });
-  } catch (e) {
-    console.error("nameAliases読み込み失敗", e);
-  }
 
   function resolveName(name) {
     let current = name;
@@ -196,12 +189,13 @@ async function init(plan) {
       changeNameBtn.textContent = "更新中...";
 
       try {
-        // 既存の記録は書き換えず、「旧名前→新名前」の対応だけを新規追加する
-        await db.collection("nameAliases").add({
-          oldName: oldName,
-          newName: newName,
-          updatedAt: new Date()
-        });
+        // settings/config ドキュメントの nameAliases フィールドに
+        // 「旧名前→新名前」の対応を追加（既存データは書き換えない）
+        await db.collection("settings").doc("config").set({
+          nameAliases: {
+            [oldName]: newName
+          }
+        }, { merge: true });
 
         localStorage.setItem("username", newName);
         alert("名前を変更しました。過去の記録も新しい名前で表示されます");
@@ -239,6 +233,9 @@ async function init(plan) {
   }
 
   const startDate = configDoc.data().startDate;
+
+  // configDoc内のnameAliasesを読み込む
+  nameAliasMap = configDoc.data().nameAliases || {};
 
   // ===== 日数計算 =====
   const diffDays = Math.floor(
