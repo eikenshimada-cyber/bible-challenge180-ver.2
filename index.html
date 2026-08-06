@@ -53,6 +53,11 @@ nav button { flex:1; border:none; background:none; font-size:14px; }
   </div>
 
   <div class="card">
+    <div>お名前：<span id="userNameDisplay"></span></div>
+    <button id="changeNameBtn">名前を変更</button>
+  </div>
+
+  <div class="card">
     <h2>Good Servant</h2>
     <div id="readers"></div>
   </div>
@@ -143,6 +148,58 @@ async function init(plan) {
   if (!username) {
     username = prompt("名前を入力してください");
     if (username) localStorage.setItem("username", username);
+  }
+
+  // ===== 名前表示・変更 =====
+  const userNameDisplay = document.getElementById("userNameDisplay");
+  const changeNameBtn = document.getElementById("changeNameBtn");
+
+  if (userNameDisplay) userNameDisplay.textContent = username || "未設定";
+
+  if (changeNameBtn) {
+    changeNameBtn.onclick = async () => {
+      const oldName = username;
+      const newNameInput = prompt("新しい名前を入力してください", oldName || "");
+      if (!newNameInput || !newNameInput.trim()) return;
+
+      const newName = newNameInput.trim();
+      if (newName === oldName) return;
+
+      const ok = confirm(
+        `「${oldName}」から「${newName}」に変更します。\n過去の読了記録も新しい名前に引き継がれます。よろしいですか？`
+      );
+      if (!ok) return;
+
+      changeNameBtn.disabled = true;
+      changeNameBtn.textContent = "更新中...";
+
+      try {
+        // 既存の読了記録（全ユーザー分）を取得し、旧名前と一致するものを新しい名前に更新
+        const allUsersSnapshot = await db.collectionGroup("users").get();
+        const matchedDocs = allUsersSnapshot.docs.filter(
+          doc => doc.data().name === oldName
+        );
+
+        const chunkSize = 400; // Firestoreのbatch上限(500)に対する安全マージン
+        for (let i = 0; i < matchedDocs.length; i += chunkSize) {
+          const batch = db.batch();
+          matchedDocs.slice(i, i + chunkSize).forEach(doc => {
+            batch.update(doc.ref, { name: newName });
+          });
+          await batch.commit();
+        }
+
+        localStorage.setItem("username", newName);
+        alert("名前を変更し、過去の記録も引き継ぎました");
+        location.reload();
+
+      } catch (e) {
+        console.error(e);
+        alert("エラーが発生しました。名前の変更に失敗しました。");
+        changeNameBtn.disabled = false;
+        changeNameBtn.textContent = "名前を変更";
+      }
+    };
   }
 
   // ===== 日付（日本時間）=====
