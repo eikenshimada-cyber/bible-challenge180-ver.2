@@ -156,6 +156,28 @@ async function init(plan) {
 
   if (userNameDisplay) userNameDisplay.textContent = username || "未設定";
 
+  // ===== 名前エイリアス（旧名前→新名前）を読み込み =====
+  let nameAliasMap = {};
+  try {
+    const aliasSnapshot = await db.collection("nameAliases").get();
+    aliasSnapshot.forEach(doc => {
+      const d = doc.data();
+      if (d.oldName && d.newName) nameAliasMap[d.oldName] = d.newName;
+    });
+  } catch (e) {
+    console.error("nameAliases読み込み失敗", e);
+  }
+
+  function resolveName(name) {
+    let current = name;
+    const seen = new Set();
+    while (nameAliasMap[current] && !seen.has(current)) {
+      seen.add(current);
+      current = nameAliasMap[current];
+    }
+    return current;
+  }
+
   if (changeNameBtn) {
     changeNameBtn.onclick = async () => {
       const oldName = username;
@@ -174,28 +196,23 @@ async function init(plan) {
       changeNameBtn.textContent = "更新中...";
 
       try {
-        // 既存の読了記録（全ユーザー分）を取得し、旧名前と一致するものを新しい名前に更新
-        const allUsersSnapshot = await db.collectionGroup("users").get();
-        const matchedDocs = allUsersSnapshot.docs.filter(
-          doc => doc.data().name === oldName
-        );
-
-        const chunkSize = 400; // Firestoreのbatch上限(500)に対する安全マージン
-        for (let i = 0; i < matchedDocs.length; i += chunkSize) {
-          const batch = db.batch();
-          matchedDocs.slice(i, i + chunkSize).forEach(doc => {
-            batch.update(doc.ref, { name: newName });
-          });
-          await batch.commit();
-        }
+        // 既存の記録は書き換えず、「旧名前→新名前」の対応だけを新規追加する
+        await db.collection("nameAliases").add({
+          oldName: oldName,
+          newName: newName,
+          updatedAt: new Date()
+        });
 
         localStorage.setItem("username", newName);
-        alert("名前を変更し、過去の記録も引き継ぎました");
+        alert("名前を変更しました。過去の記録も新しい名前で表示されます");
         location.reload();
 
       } catch (e) {
         console.error(e);
-        alert("エラーが発生しました。名前の変更に失敗しました。");
+        alert(
+          "エラーが発生しました。名前の変更に失敗しました。\n\n" +
+          "詳細: " + (e.code || "") + " " + (e.message || e)
+        );
         changeNameBtn.disabled = false;
         changeNameBtn.textContent = "名前を変更";
       }
@@ -257,6 +274,7 @@ async function init(plan) {
 
       snapshot.forEach(doc => {
         const data = doc.data();
+        const resolvedName = resolveName(data.name);
 
         let d;
         if (data.timestamp && data.timestamp.toDate) {
@@ -270,12 +288,12 @@ async function init(plan) {
         }
 
         list.push({
-          name: data.name,
+          name: resolvedName,
           date: d,
           doc: doc
         });
 
-        if (doc.ref.parent.parent.id === dateKey && data.name === username) {
+        if (doc.ref.parent.parent.id === dateKey && resolvedName === username) {
           alreadyRead = true;
         }
       });
